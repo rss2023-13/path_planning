@@ -8,7 +8,7 @@ from nav_msgs.msg import OccupancyGrid
 import json
 import tf.transformations
 import tf
-from scipy import ndimage
+# from scipy import ndimage
 
 
 EPSILON = 0.00000000001
@@ -126,6 +126,9 @@ class LineTrajectory(object):
 
     def publish_start_point(self, duration=0.0, scale=0.1):
         should_publish = len(self.points) > 0
+        rospy.loginfo('start')
+        rospy.loginfo(self.visualize)
+        rospy.loginfo(self.start_pub.get_num_connections())
         if self.visualize and self.start_pub.get_num_connections() > 0:
             print "Publishing start point"
             marker = Marker()
