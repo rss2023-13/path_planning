@@ -40,7 +40,7 @@ class PurePursuit(object):
 
     def pose_callback(self, odom):
         self.pose = odom.pose.pose
-        min_point, min_dist = self.min_dist(np.array([self.pose.position.x, self.pose.position.y]), self.trajectory.points)
+        min_segment_index, min_point, min_dist = self.min_dist(np.array([self.pose.position.x, self.pose.position.y]), self.trajectory.points)
         self.min_dist_pub.publish(PointStamped(point=Point(x=min_point[0], y=min_point[1], z=0), header=Header(frame_id="map")))
 
     def old_min_dist(self, robot_position, v, w):
@@ -78,12 +78,7 @@ class PurePursuit(object):
         index = np.argmin(distance)
         min_distance = distance[index]
         min_point = projection[index]
-        return (min_point, min_distance)
-        # print(robot_position)
-        # print(distance)
-         
-
-
+        return (index, min_point, min_distance)
 
 if __name__=="__main__":
     rospy.init_node("pure_pursuit")
