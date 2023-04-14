@@ -40,17 +40,17 @@ class PurePursuit(object):
 
     def pose_callback(self, odom):
         self.pose = odom.pose.pose
-        min_point, dist = self.min_dist([self.pose.position.x, self.pose.position.y], self.trajectory.points[0], self.trajectory.points[1])
+        min_point, min_dist = self.min_dist(np.array([self.pose.position.x, self.pose.position.y]), self.trajectory.points)
         self.min_dist_pub.publish(PointStamped(point=Point(x=min_point[0], y=min_point[1], z=0), header=Header(frame_id="map")))
 
-    def min_dist(self, robot_position, v, w):
+    def old_min_dist(self, robot_position, v, w):
         # Return minimum distance between line segment vw and point p
         # v, w are Point
         robot_position = np.array(robot_position)
         w = np.array(w)
         v = np.array(v)
 
-        l2 = np.linalg.norm(w-v)**2  # i.e. |w-v|^2 -  avoid a sqrt
+        l2 = np.linalg.norm(w-v)**2  # i.e. |w-v|^2 
         if (l2 == 0.0):
             return (v, np.linalg.norm(robot_position-v))   # v == w case
 
@@ -61,6 +61,27 @@ class PurePursuit(object):
         t = max(0, min(1, np.dot(robot_position - v, w - v) / l2))
         projection = v + t * (w - v) # Projection falls on the segment
         return (projection, np.linalg.norm(robot_position - projection))
+
+    def min_dist(self, robot_position, trajectory_points):
+        epsilon = .01
+        startpoints = np.array(trajectory_points)
+        endpoints = np.roll(startpoints, -1, axis=0)
+        startpoints = startpoints[:-1]
+        endpoints = endpoints[:-1]
+
+        l2 = np.linalg.norm(startpoints-endpoints, axis=1)**2 # vectorized distance between each pair of points
+        l2[l2 == 0] = epsilon # eliminate possibility of divide by 0 if start=end for a segment
+        t = np.clip(np.sum((robot_position-startpoints)*(endpoints-startpoints), axis=1)/l2, 0, 1)
+        projection = startpoints + (t * (endpoints - startpoints).T).T
+        # print('p', projection)
+        distance = np.linalg.norm(robot_position - projection, axis = 1)
+        index = np.argmin(distance)
+        min_distance = distance[index]
+        min_point = projection[index]
+        return (min_point, min_distance)
+        # print(robot_position)
+        # print(distance)
+         
 
 
 
