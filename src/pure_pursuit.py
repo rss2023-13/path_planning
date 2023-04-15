@@ -29,6 +29,7 @@ class PurePursuit(object):
         self.drive_pub = rospy.Publisher("/drive", AckermannDriveStamped, queue_size=1)
 
         self.min_dist_pub = rospy.Publisher("/min_point", PointStamped, queue_size=1)
+        self.intersection_pub = rospy.Publisher("/intersection", PointStamped, queue_size=1)
 
     def trajectory_callback(self, msg):
         ''' Clears the currently followed trajectory, and loads the new one from the message
@@ -42,7 +43,13 @@ class PurePursuit(object):
         self.pose = odom.pose.pose
         robot_position = np.array([self.pose.position.x, self.pose.position.y])
         min_segment_index, min_point, min_dist = self.min_dist(robot_position, self.trajectory.points)
-        self.min_dist_pub.publish(PointStamped(point=Point(x=min_point[0], y=min_point[1], z=0), header=Header(frame_id="map")))
+        self.min_dist_pub.publish(PointStamped(point=Point(x=min_point[0], y=min_point[1], z=0), 
+                                               header=Header(frame_id="map")))
+        intersection_exists, intersection = self.find_intersection(min_segment_index, robot_position)
+        if intersection_exists:
+            self.intersection_pub.publish(PointStamped(point=Point(x=intersection[0], y=intersection[1], z=0), 
+                                        header=Header(frame_id="map")))
+
 
     def min_dist(self, robot_position, trajectory_points):
         epsilon = .01
@@ -62,14 +69,27 @@ class PurePursuit(object):
         min_point = projection[index]
         return (index, min_point, min_distance)
     
-    def find_intersection(self, closest_index, robot_position, robot_angle):
+    def find_intersection(self, closest_index, robot_position):
         """
         Returns a point that is "lookahead distance" away from the car
         but also on the trajectory path. The search starts from the nearest
         linear trajectory segment and proceeds in order if not found
         """
+        current_segment_index = closest_index
+        point_exists = False
+        while not point_exists: # Loop through the segments in the traj
+            start_point = np.array([self.trajectory.points[current_segment_index]])
+            end_point = np.array([self.trajectory.points[current_segment_index+1]])
+
+            point_exists, point = self.circle_intersection(start_point, end_point, robot_position)
+            if point_exists:
+                return point_exists, point
+
+            current_segment_index += 1
+            if current_segment_index >= len(self.trajectory.points): # We passed the last segment of the traj
+                return False, None
         
-    def circle_intersection(self, start_point, end_point, robot_position, robot_angle):
+    def circle_intersection(self, start_point, end_point, robot_position):
         """
         Finds the points of intersection between a circle of radius "lookahead 
         distance" and a line segment given by the start_point and end_point.
