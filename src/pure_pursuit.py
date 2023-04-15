@@ -17,7 +17,7 @@ class PurePursuit(object):
     """
     def __init__(self):
         self.odom_topic       = rospy.get_param("~odom_topic", "/pf/pose/odom")
-        # self.lookahead        = # FILL IN #
+        self.lookahead        = 1 # TODO: Tune this
         self.speed            = 2
         # self.wheelbase_length = # FILL IN #
         
@@ -33,34 +33,16 @@ class PurePursuit(object):
     def trajectory_callback(self, msg):
         ''' Clears the currently followed trajectory, and loads the new one from the message
         '''
-        print "Receiving new trajectory:", len(msg.poses), "points"
+        print("Receiving new trajectory:", len(msg.poses), "points")
         self.trajectory.clear()
         self.trajectory.fromPoseArray(msg)
         self.trajectory.publish_viz(duration=0.0)
 
     def pose_callback(self, odom):
         self.pose = odom.pose.pose
-        min_segment_index, min_point, min_dist = self.min_dist(np.array([self.pose.position.x, self.pose.position.y]), self.trajectory.points)
+        robot_position = np.array([self.pose.position.x, self.pose.position.y])
+        min_segment_index, min_point, min_dist = self.min_dist(robot_position, self.trajectory.points)
         self.min_dist_pub.publish(PointStamped(point=Point(x=min_point[0], y=min_point[1], z=0), header=Header(frame_id="map")))
-
-    def old_min_dist(self, robot_position, v, w):
-        # Return minimum distance between line segment vw and point p
-        # v, w are Point
-        robot_position = np.array(robot_position)
-        w = np.array(w)
-        v = np.array(v)
-
-        l2 = np.linalg.norm(w-v)**2  # i.e. |w-v|^2 
-        if (l2 == 0.0):
-            return (v, np.linalg.norm(robot_position-v))   # v == w case
-
-        # Consider the line extending the segment, parameterized as v + t (w - v).
-        # We find projection of point p onto the line. 
-        # It falls where t = [(p-v) . (w-v)] / |w-v|^2
-        # We clamp t from [0,1] to handle points outside the segment vw.
-        t = max(0, min(1, np.dot(robot_position - v, w - v) / l2))
-        projection = v + t * (w - v) # Projection falls on the segment
-        return (projection, np.linalg.norm(robot_position - projection))
 
     def min_dist(self, robot_position, trajectory_points):
         epsilon = .01
@@ -79,6 +61,72 @@ class PurePursuit(object):
         min_distance = distance[index]
         min_point = projection[index]
         return (index, min_point, min_distance)
+    
+    def find_intersection(self, closest_index, robot_position, robot_angle):
+        """
+        Returns a point that is "lookahead distance" away from the car
+        but also on the trajectory path. The search starts from the nearest
+        linear trajectory segment and proceeds in order if not found
+        """
+        
+    def circle_intersection(self, start_point, end_point, robot_position, robot_angle):
+        """
+        Finds the points of intersection between a circle of radius "lookahead 
+        distance" and a line segment given by the start_point and end_point.
+        """
+        # Center of circle is robot_position: Q
+        # Radius of circle is self.lookahead: r
+        # Start of line segment is start_point: P1
+        V = end_point - start_point  # Vector along line segment
+
+        # Quadratic equation coefficients
+        a = V.dot(V)
+        b = 2 * V.dot(start_point - robot_position)
+        c = (start_point.dot(start_point) + robot_position.dot(robot_position) 
+             - 2 * start_point.dot(robot_position) - self.lookahead**2)
+        
+        disc = b**2 - 4 * a * c
+        if disc < 0: # Quadratic has no real solutions
+            return False, None
+        
+        sqrt_disc = np.sqrt(disc)
+        t1 = (-b + sqrt_disc) / (2 * a)
+        t2 = (-b - sqrt_disc) / (2 * a)
+
+        # TODO: Only pick points that are in front of us
+        p1 = start_point + t1 * V
+        p2 = start_point + t2 * V
+
+        # TODO: If both points are in front, pick the closer one
+
+        if 0 <= t1 <= 1: # Prioritize point that is closer to the endpoint than startpoint
+            return True, p1
+        else: # Move to next line segment if the one closer to endpoint is not on the segment
+            return False, None
+        # elif 0 <= t2 <= 1:
+        #     return True, p2
+        # else: # No solutions within the line segment
+        #     return False, None
+
+    
+    def old_min_dist(self, robot_position, v, w):
+        # Return minimum distance between line segment vw and point p
+        # v, w are Point
+        robot_position = np.array(robot_position)
+        w = np.array(w)
+        v = np.array(v)
+
+        l2 = np.linalg.norm(w-v)**2  # i.e. |w-v|^2 
+        if (l2 == 0.0):
+            return (v, np.linalg.norm(robot_position-v))   # v == w case
+
+        # Consider the line extending the segment, parameterized as v + t (w - v).
+        # We find projection of point p onto the line. 
+        # It falls where t = [(p-v) . (w-v)] / |w-v|^2
+        # We clamp t from [0,1] to handle points outside the segment vw.
+        t = max(0, min(1, np.dot(robot_position - v, w - v) / l2))
+        projection = v + t * (w - v) # Projection falls on the segment
+        return (projection, np.linalg.norm(robot_position - projection))
 
 if __name__=="__main__":
     rospy.init_node("pure_pursuit")
