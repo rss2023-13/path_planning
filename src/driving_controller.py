@@ -31,17 +31,21 @@ class DrivingController():
         self.relative_x = 0
         self.relative_y = 0
 
-        self.steering_kp = 0.01
-        self.steering_kd = 0
+        self.prev_angle = 0
+        self.prev_time = rospy.get_time()
+
+        self.steering_kp = 0.7
+        self.steering_kd = 0.1
         self.steering_ki = 0
 
-        self.velocity_kp = 1
+        self.velocity_kp = 4
         self.velocity_kd = 0
         self.velocity_ki = 0
-        self.velocity_max = 1
+        self.velocity_max = 5
 
     def pose_callback(self, odom):
         self.robot_pose = odom.pose.pose
+        print('robot position ', self.robot_pose.position)
 
     def lookahead_callback(self, msg):
         self.relative_x, self.relative_y = self.robot_to_world(msg.point.x, msg.point.y)
@@ -59,19 +63,12 @@ class DrivingController():
         x_error = self.relative_x - self.parking_distance
         angle = np.arctan2(self.relative_y, self.relative_x)
         overall_error = np.linalg.norm([x_error, y_error])
-        # if np.abs(y_error) > np.abs(x_error):
-        #     error_to_use = y_error
-        # else:
-        #     error_to_use = x_error
 
-        # rospy.loginfo("overall error" + str(overall_error))
-        # rospy.loginfo("x error" + str(x_error))
-        # rospy.loginfo("y error" + str(y_error))
-        # error_to_use = overall_error # This doesn't work for some reason
+        current_time = rospy.get_time()
 
-        # Set the steering angle
-        print('angle ', angle)
-        steering_angle = self.steering_kp * angle
+        angle_derivative = (angle - self.prev_angle)/(current_time - self.prev_time)
+
+        steering_angle = self.steering_kp * angle + self.steering_kd*angle_derivative
 
 
         # Set the velocity
@@ -81,7 +78,6 @@ class DrivingController():
             steering_angle = angle
             velocity = .2 * overall_error
 
-
         drive_cmd.drive.steering_angle = steering_angle
         drive_cmd.drive.speed = np.min([velocity, self.velocity_max])
         rospy.loginfo("steering" + str(steering_angle))
@@ -90,6 +86,8 @@ class DrivingController():
         print('velocity ', velocity)
 
         self.drive_pub.publish(drive_cmd)
+        self.prev_angle = angle
+        self.prev_time = current_time
         # self.error_publisher()
 
     def error_publisher(self):
@@ -111,8 +109,9 @@ class DrivingController():
 
     def robot_to_world(self, x, y):
         angle = self.euler_from_quaternion(self.robot_pose.orientation)[2]
-        rotation_matrix = np.array([[np.cos(angle), -np.sin(angle), 0], 
-                                    [np.sin(angle), np.cos(angle), 0], 
+        print('robot angle ', angle)
+        rotation_matrix = np.array([[np.cos(angle), np.sin(angle), 0], 
+                                    [-np.sin(angle), np.cos(angle), 0], 
                                     [0, 0, 1]])
         rotated_coord =  np.matmul(rotation_matrix, np.array([x - self.robot_pose.position.x, y - self.robot_pose.position.y, 0]))
         
