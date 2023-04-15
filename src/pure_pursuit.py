@@ -78,15 +78,15 @@ class PurePursuit(object):
         current_segment_index = closest_index
         point_exists = False
         while not point_exists: # Loop through the segments in the traj
-            start_point = np.array([self.trajectory.points[current_segment_index]])
-            end_point = np.array([self.trajectory.points[current_segment_index+1]])
+            start_point = np.array(self.trajectory.points[current_segment_index])
+            end_point = np.array(self.trajectory.points[current_segment_index+1])
 
             point_exists, point = self.circle_intersection(start_point, end_point, robot_position)
             if point_exists:
                 return point_exists, point
 
             current_segment_index += 1
-            if current_segment_index >= len(self.trajectory.points): # We passed the last segment of the traj
+            if current_segment_index >= len(self.trajectory.points)-1: # We passed the last segment of the traj
                 return False, None
         
     def circle_intersection(self, start_point, end_point, robot_position):
