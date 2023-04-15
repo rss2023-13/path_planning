@@ -11,6 +11,7 @@ from visualization_msgs.msg import Marker
 from ackermann_msgs.msg import AckermannDriveStamped
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Header
+from driving_controller import DrivingController
 
 class PurePursuit(object):
     """ Implements Pure Pursuit trajectory tracking with a fixed lookahead and speed.
@@ -22,11 +23,12 @@ class PurePursuit(object):
         # self.wheelbase_length = # FILL IN #
         
         self.pose = None
+        self.target_point = None
 
         self.trajectory  = utils.LineTrajectory("/followed_trajectory")
         self.traj_sub = rospy.Subscriber("/trajectory/current", PoseArray, self.trajectory_callback, queue_size=1)
         self.pose_sub = rospy.Subscriber(self.odom_topic, Odometry, self.pose_callback, queue_size=1)
-        self.drive_pub = rospy.Publisher("/drive", AckermannDriveStamped, queue_size=1)
+        # self.drive_pub = rospy.Publisher("/drive", AckermannDriveStamped, queue_size=1)
 
         self.min_dist_pub = rospy.Publisher("/min_point", PointStamped, queue_size=1)
         self.intersection_pub = rospy.Publisher("/intersection", PointStamped, queue_size=1)
@@ -42,13 +44,18 @@ class PurePursuit(object):
     def pose_callback(self, odom):
         self.pose = odom.pose.pose
         robot_position = np.array([self.pose.position.x, self.pose.position.y])
+        # if self.target_point is None or np.linalg.norm(robot_position - self.target_point) < 0.25:
         min_segment_index, min_point, min_dist = self.min_dist(robot_position, self.trajectory.points)
         self.min_dist_pub.publish(PointStamped(point=Point(x=min_point[0], y=min_point[1], z=0), 
-                                               header=Header(frame_id="map")))
+                                            header=Header(frame_id="map")))
         intersection_exists, intersection = self.find_intersection(min_segment_index, robot_position)
         if intersection_exists:
             self.intersection_pub.publish(PointStamped(point=Point(x=intersection[0], y=intersection[1], z=0), 
                                         header=Header(frame_id="map")))
+            # self.target_point = intersection
+        # else:
+        #     self.intersection_pub.publish(PointStamped(point=Point(x=self.target_point[0], y=self.target_point[1], z=0), 
+        #                                     header=Header(frame_id="map")))
 
 
     def min_dist(self, robot_position, trajectory_points):
@@ -151,4 +158,5 @@ class PurePursuit(object):
 if __name__=="__main__":
     rospy.init_node("pure_pursuit")
     pf = PurePursuit()
+    dc = DrivingController()
     rospy.spin()
