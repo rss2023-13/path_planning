@@ -25,31 +25,25 @@ class DrivingController():
         self.pose_sub = rospy.Subscriber(self.odom_topic, Odometry, self.pose_callback, queue_size=1)
 
         self.robot_pose = None
-        # self.error_pub = rospy.Publisher("/parking_error", ParkingError, queue_size=10)
 
-        self.parking_distance = 0 # meters
+        self.parking_distance = 0 # goal distance from target
         self.relative_x = 0
         self.relative_y = 0
 
         self.prev_angle = 0
         self.prev_time = rospy.get_time()
 
-        self.steering_kp = 0.7
-        self.steering_kd = 0.1
-        self.steering_ki = 0
+        self.steering_kp = 1
+        self.steering_kd = 0.13
 
-        self.velocity_kp = 4
-        self.velocity_kd = 0
-        self.velocity_ki = 0
+        self.velocity_kp = 2
         self.velocity_max = 5
 
     def pose_callback(self, odom):
         self.robot_pose = odom.pose.pose
-        print('robot position ', self.robot_pose.position)
 
     def lookahead_callback(self, msg):
         self.relative_x, self.relative_y = self.robot_to_world(msg.point.x, msg.point.y)
-        print(self.relative_x, self.relative_y)
         drive_cmd = AckermannDriveStamped()
 
         #################################
@@ -80,10 +74,9 @@ class DrivingController():
 
         drive_cmd.drive.steering_angle = steering_angle
         drive_cmd.drive.speed = np.min([velocity, self.velocity_max])
-        rospy.loginfo("steering" + str(steering_angle))
+        # rospy.loginfo("steering" + str(steering_angle))
 
         #################################
-        print('velocity ', velocity)
 
         self.drive_pub.publish(drive_cmd)
         self.prev_angle = angle
@@ -109,7 +102,6 @@ class DrivingController():
 
     def robot_to_world(self, x, y):
         angle = self.euler_from_quaternion(self.robot_pose.orientation)[2]
-        print('robot angle ', angle)
         rotation_matrix = np.array([[np.cos(angle), np.sin(angle), 0], 
                                     [-np.sin(angle), np.cos(angle), 0], 
                                     [0, 0, 1]])

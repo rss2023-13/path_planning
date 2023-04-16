@@ -1,3 +1,4 @@
 *.pyc
+*.bag
 .DS_Store
 trajectories/*
