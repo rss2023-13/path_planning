@@ -60,9 +60,13 @@ class PathPlan(object):
         # pick next random point
         pass
 
-    def collision_check(self, map, position):
-        # return True is collision exists at this point
+    def point_collision_check(self, map, position):
+        # return True if collision exists at this point
         pass 
+
+    def path_collision_check(self, map, start, end):
+        # check that the path between start, end is collision free - identify occupancy grid squares affected and check each
+        pass
 
     def find_nearest_vertex(self, graph, position):
         # find nearest vertex to a given position
@@ -75,9 +79,12 @@ class PathPlan(object):
         current_iter = 0
         while not goal_reached and current_iter <= max_iter :
             node_new = self.sample_map(map)
-            if self.collision_check(map, node_new):
+            if self.point_collision_check(map, node_new):
                 continue 
+
             node_nearest = self.find_nearest_vertex(self.tree, node_new)
+            if self.path_collision_check(map, node_new, node_nearest):
+                continue
 
             # update tree
             self.tree[node_new] = set() # initialize new node in tree
@@ -85,12 +92,21 @@ class PathPlan(object):
             self.parents[node_new] = node_nearest 
 
             if node_new == end_point:
-                break # end while
+                goal_reached = True
             
             current_iter += 1
         
         # by this point, the tree has been constructed
-        # need to reconstruct trajectory given graph: recurse thru self.parents
+        # need to reconstruct trajectory given graph by recursing thru self.parents
+        reverse_path = [end_point] # points along traj in reverse order
+        
+        current_node = end_point
+        while current_node != start_point:
+            current_node = self.parents[end_point] # backtrack to parent node
+            reverse_path.append(current_node)
+
+        for pt in reverse_path[::-1]: # populate trajectory object
+            self.trajectory.addPoint(pt)
 
         # publish trajectory
         self.traj_pub.publish(self.trajectory.toPoseArray())
