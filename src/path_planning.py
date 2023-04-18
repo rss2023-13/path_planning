@@ -56,13 +56,18 @@ class PathPlan(object):
         self.goal_pose = msg.pose
         pass ## REMOVE AND FILL IN ##
 
+
+    ### helpers for rrt alg ###
     def sample_map(self, map):
         # pick next random point
+        rand_vals = np.random.random([1,2])
+        # TODO: convert to a point using map dimensions
         pass
 
     def point_collision_check(self, map, position):
         # return True if collision exists at this point
-        pass 
+        grid_ind = None #grid_ind should be the ind of the 1d occupancy grid cell the position belongs in
+        return map[grid_ind] != 0
 
     def path_collision_check(self, map, start, end):
         # check that the path between start, end is collision free - identify occupancy grid squares affected and check each
@@ -70,8 +75,12 @@ class PathPlan(object):
 
     def find_nearest_vertex(self, graph, position):
         # find nearest vertex to a given position
+        # simplest heuristic: euclidean distance
+        # could consider others like spline? dubins path? -- this can be an optimization task
+        # iterate through node list and identify the one with lowest distance
         pass
 
+    ### rrt alg ###
     def plan_path(self, start_point, end_point, map):
         ## CODE FOR PATH PLANNING ##
         goal_reached = False
@@ -97,7 +106,7 @@ class PathPlan(object):
             current_iter += 1
         
         # by this point, the tree has been constructed
-        # need to reconstruct trajectory given graph by recursing thru self.parents
+        # reconstruct trajectory given graph by recursing thru self.parents
         reverse_path = [end_point] # points along traj in reverse order
         
         current_node = end_point
