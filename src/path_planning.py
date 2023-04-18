@@ -24,7 +24,7 @@ class PathPlan(object):
 
         self.odom_topic = rospy.get_param("~odom_topic")
         self.map_sub = rospy.Subscriber("/map", OccupancyGrid, self.map_cb)
-        self.goal_sub = rospy.Subscriber("/move_base_simple/goal", PoseStamped, self.goal_cb, queue_size=10)
+        self.goal_sub = rospy.Subscriber("/move_base_simple/goal", PoseStamped, self.goal_cb)
         self.odom_sub = rospy.Subscriber(self.odom_topic, Odometry, self.odom_cb)
 
 
@@ -36,7 +36,7 @@ class PathPlan(object):
         self.parents = {} # child : parent
 
         # plan path
-        self.plan_path(self.current_pose, self.goal_pose, self.map, None)
+        # self.plan_path(self.current_pose, self.goal_pose, self.map, None)
 
 
     def map_cb(self, map_msg): 
@@ -66,6 +66,7 @@ class PathPlan(object):
         self.map_height = map_msg.info.height
         self.map_width = map_msg.info.width
         self.map_resolution = map_msg.info.resolution # meters / cell
+        rospy.logerr("map dims: %s %s", self.map_height, self.map_width)
         # self.map_origin = 
         pass ## REMOVE AND FILL IN ##
 
@@ -113,10 +114,11 @@ class PathPlan(object):
         """
         
         while True:
-            rand_indices = np.random.random(0, [self.map_height, self.map_width])
-            v, u = rand_indices[0], rand_indices[1] #y direction, x direction
+            v, u = np.random.randint(0, self.map_height), np.random.randint(0, self.map_width)
 
-            if self.point_collision_check(map, rand_indices) == True: # collision happens
+            # v, u = rand_indices[0], rand_indices[1] #y direction, x direction
+
+            if self.point_collision_check(self.map, v, u) == True: # collision happens
                 continue
 
             else:
@@ -143,7 +145,8 @@ class PathPlan(object):
 
     def reached_goal(self, node, end_point):
         #if node is near end_point, return true. Else return false
-        # "near" = in either the same cell or directly adjacent cell to the goal state cell 
+        # "near" = in either the same cell or directly adjacent cell to the goal state cell
+        # TODO: exclude adjacent cells that are not empty  
         goal_cell = self.world_to_cell(end_point)
         node_cell = self.world_to_cell(node)
 
@@ -179,6 +182,8 @@ class PathPlan(object):
 
             current_iter += 1
 
+        print(current_iter)
+
         # by this point, the tree has been constructed
         # reconstruct trajectory given graph by recursing thru self.parents
         reverse_path = [end_point] # points along traj in reverse order
@@ -201,4 +206,6 @@ class PathPlan(object):
 if __name__=="__main__":
     rospy.init_node("path_planning")
     pf = PathPlan()
+    print("these are map dims:", pf.map_height, pf.map_width)
+    pf.plan_path(pf.current_pose, pf.goal_pose, pf.map, None)
     rospy.spin()
