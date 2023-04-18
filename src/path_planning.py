@@ -18,7 +18,7 @@ class PathPlan(object):
         self.map = None
         self.map_height = 0
         self.map_width = 0
-        self.map_resolution = 
+        self.map_resolution = None
         self.goal_pose = None
         self.current_pose = None
 
@@ -77,6 +77,9 @@ class PathPlan(object):
         pass ## REMOVE AND FILL IN ##
 
     def cell_to_world(self, u, v):
+        '''
+        convert __ to __
+        '''
         angle = self.map_origin[2]
         rotation_matrix = np.array([[np.cos(angle), np.sin(angle), 0], 
                                     [-np.sin(angle), np.cos(angle), 0], 
@@ -85,7 +88,14 @@ class PathPlan(object):
         
         return (rotated_coord[0], rotated_coord[1])
 
+    def world_to_cell(self, position):
+        angle = self.map_origin[2]
+        rotation_matrix_inv = np.linalg.inv(np.array([[np.cos(angle), np.sin(angle), 0], 
+                                                    [-np.sin(angle), np.cos(angle), 0], 
+                                                    [0, 0, 1]]))
+        orig_coord = 1/self.map_resolution * (np.matmul(rotation_matrix_inv, np.array([position[0], position[1], 0])) - self.map_origin)
 
+        return orig_coord # in form of (u, v)
 
     ### helpers for rrt alg ###
     def sample_map(self):
@@ -109,10 +119,6 @@ class PathPlan(object):
             else:
                 return self.cell_to_world(u, v)
             
-        # pick next random point
-        
-        # TODO: convert to a point using map dimensions
-        pass
 
     def point_collision_check(self, v, u):
         # return True if collision exists at this cell
@@ -123,18 +129,24 @@ class PathPlan(object):
         # check that the path between start, end is collision free - identify occupancy grid squares affected and check each
         pass
 
-    def find_nearest_vertex(self, graph, position):
+    def find_nearest_vertex(self, position):
         # find nearest vertex to a given position
         # simplest heuristic: euclidean distance
         # could consider others like spline? dubins path? -- this can be an optimization task
         # iterate through node list and identify the one with lowest distance
-        pass
+        dists = np.array([np.linalg.norm(np.array(position) - np.array(v)) for v in self.parents.keys]) # euclidean distance to all vertices
+        min_ind = np.argmin(dists)
+        return self.parents.keys[min_ind]
 
     def reached_goal(self, node, end_point):
-
         #if node is near end_point, return true. Else return false
+        # "near" = in either the same cell or directly adjacent cell to the goal state cell 
+        goal_cell = self.world_to_cell(end_point)
+        node_cell = self.world_to_cell(node)
 
-        pass
+        acceptable_cells = set(goal_cell, (goal_cell[0], goal_cell[1]+1), (goal_cell[0], goal_cell[1]-1), (goal_cell[0]+1, goal_cell[1]), (goal_cell[0]-1, goal_cell[1]))
+        return node_cell in acceptable_cells
+    
 
     ### rrt alg ###
     def plan_path(self, start_point, end_point, map, max_distance):
@@ -146,7 +158,7 @@ class PathPlan(object):
         while not goal_reached and current_iter <= max_iter :
             node_new = self.sample_map(map) # point collision check is perfomed in sampling (only return valid samples)
 
-            node_nearest = self.find_nearest_vertex(self.tree, node_new)
+            node_nearest = self.find_nearest_vertex(node_new)
             if self.path_collision_check(map, node_new, node_nearest):
                 continue
 
