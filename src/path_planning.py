@@ -23,19 +23,22 @@ class PathPlan(object):
         self.current_pose = None
 
         self.odom_topic = rospy.get_param("~odom_topic")
-        self.map_sub = rospy.Subscriber("/map", OccupancyGrid, self.map_cb)
-        self.goal_sub = rospy.Subscriber("/move_base_simple/goal", PoseStamped, self.goal_cb)
-        self.odom_sub = rospy.Subscriber(self.odom_topic, Odometry, self.odom_cb)
+        self.map_sub = rospy.Subscriber("/map", OccupancyGrid, self.map_cb, queue_size=1)
+        self.goal_sub = rospy.Subscriber("/move_base_simple/goal", PoseStamped, self.goal_cb, queue_size=1)
+        self.odom_sub = rospy.Subscriber(self.odom_topic, Odometry, self.odom_cb, queue_size=1)
 
 
         self.trajectory = LineTrajectory("/planned_trajectory")
-        self.traj_pub = rospy.Publisher("/trajectory/current", PoseArray, queue_size=10)
+        self.traj_pub = rospy.Publisher("/trajectory/current", PoseArray, queue_size=1)
 
         # use 2 dictionaries to manage rrt graph structure / path reconstruction
         self.tree = {} # parent : set(children) --- actually maybe don't need this, not really using it
         self.parents = {} # child : parent
 
         # plan path
+        # while self.map == None or self.goal_pose == None or self.current_pose == None:
+        #     rospy.spin()
+            
         # self.plan_path(self.current_pose, self.goal_pose, self.map, None)
 
 
@@ -49,6 +52,7 @@ class PathPlan(object):
         # self.map = np.clip(self.map, 0, 1)
 
         # Convert the origin to a tuple
+        print("doing map callback now")
         origin_p = map_msg.info.origin.position
         origin_o = map_msg.info.origin.orientation
         origin_o = tf.euler_from_quaternion((
@@ -62,23 +66,21 @@ class PathPlan(object):
             return
 
         self.map = np.array(map_msg.data).reshape(map_msg.info.height, map_msg.info.width) # index map as grid[y direction, x direction]
-        
+        print(self.map)
+
         self.map_height = map_msg.info.height
         self.map_width = map_msg.info.width
         self.map_resolution = map_msg.info.resolution # meters / cell
-        rospy.logerr("map dims: %s %s", self.map_height, self.map_width)
+        # rospy.logerr("map dims: %s %s", self.map_height, self.map_width)
         # self.map_origin = 
-        pass ## REMOVE AND FILL IN ##
-
 
     def odom_cb(self, msg):
-        self.current_pose = msg.pose
-        pass ## REMOVE AND FILL IN ##
-
+        # print("setting odom")
+        self.current_pose = (msg.pose.pose.position.x, msg.pose.pose.position.y) 
 
     def goal_cb(self, msg):
-        self.goal_pose = msg.pose
-        pass ## REMOVE AND FILL IN ##
+        print("setting goal")
+        self.goal_pose = (msg.pose.position.x, msg.pose.position.y) 
 
     def cell_to_world(self, u, v):
         '''
@@ -118,7 +120,7 @@ class PathPlan(object):
 
             # v, u = rand_indices[0], rand_indices[1] #y direction, x direction
 
-            if self.point_collision_check(self.map, v, u) == True: # collision happens
+            if self.point_collision_check(v, u) == True: # collision happens
                 continue
 
             else:
@@ -130,7 +132,7 @@ class PathPlan(object):
         # grid_ind = None #grid_ind should be the ind of the 1d occupancy grid cell the position belongs in
         return self.map[v][u] != 0
 
-    def path_collision_check(self, map, start, end):
+    def path_collision_check(self, start, end):
         # check that the path between start, end is collision free - identify occupancy grid squares affected and check each
         pass
 
@@ -139,9 +141,12 @@ class PathPlan(object):
         # simplest heuristic: euclidean distance
         # could consider others like spline? dubins path? -- this can be an optimization task
         # iterate through node list and identify the one with lowest distance
-        dists = np.array([np.linalg.norm(np.array(position) - np.array(v)) for v in self.parents.keys]) # euclidean distance to all vertices
-        min_ind = np.argmin(dists)
-        return self.parents.keys[min_ind]
+        if self.parents == {}: # for first non-init vertex
+            return self.current_pose
+        else:
+            dists = np.array([np.linalg.norm(np.array(position) - np.array(v)) for v in self.parents.keys()]) # euclidean distance to all vertices
+            min_ind = np.argmin(dists)
+            return self.parents.keys()[min_ind]
 
     def reached_goal(self, node, end_point):
         #if node is near end_point, return true. Else return false
@@ -156,6 +161,7 @@ class PathPlan(object):
 
     ### rrt alg ###
     def plan_path(self, start_point, end_point, map, max_distance):
+        print("planning path now")
         #TODO Add max_distance parameter, new nodes should not exceed a certain distance from their nearest node
         ## CODE FOR PATH PLANNING ##
         goal_reached = False
@@ -163,9 +169,8 @@ class PathPlan(object):
         current_iter = 0
         while not goal_reached and current_iter <= max_iter :
             node_new = self.sample_map() # point collision check is perfomed in sampling (only return valid samples)
-
             node_nearest = self.find_nearest_vertex(node_new)
-            if self.path_collision_check(map, node_new, node_nearest):
+            if self.path_collision_check(node_new, node_nearest):
                 continue
 
             # update tree
@@ -182,7 +187,7 @@ class PathPlan(object):
 
             current_iter += 1
 
-        print(current_iter)
+        print("path search end, iterations:", current_iter)
 
         # by this point, the tree has been constructed
         # reconstruct trajectory given graph by recursing thru self.parents
@@ -206,6 +211,11 @@ class PathPlan(object):
 if __name__=="__main__":
     rospy.init_node("path_planning")
     pf = PathPlan()
+    
+    while pf.map == None or pf.goal_pose == None or pf.current_pose == None:
+        pass
     print("these are map dims:", pf.map_height, pf.map_width)
     pf.plan_path(pf.current_pose, pf.goal_pose, pf.map, None)
+
+
     rospy.spin()
