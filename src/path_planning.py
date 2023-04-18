@@ -32,8 +32,11 @@ class PathPlan(object):
         self.traj_pub = rospy.Publisher("/trajectory/current", PoseArray, queue_size=10)
 
         # use 2 dictionaries to manage rrt graph structure / path reconstruction
-        self.tree = {} # parent : set(children) --- actually maybe don't need this?
+        self.tree = {} # parent : set(children) --- actually maybe don't need this, not really using it
         self.parents = {} # child : parent
+
+        # plan path
+        self.plan_path(self.current_pose, self.goal_pose, self.map, None)
 
 
     def map_cb(self, map_msg): 
@@ -60,9 +63,9 @@ class PathPlan(object):
 
         self.map = np.array(map_msg.data).reshape(map_msg.info.height, map_msg.info.width) # index map as grid[y direction, x direction]
         
-        self.map_height = map.info.height
-        self.map_width = map.info.width
-        self.map_resolution = map.info.resolution # meters / cell
+        self.map_height = map_msg.info.height
+        self.map_width = map_msg.info.width
+        self.map_resolution = map_msg.info.resolution # meters / cell
         # self.map_origin = 
         pass ## REMOVE AND FILL IN ##
 
@@ -153,10 +156,10 @@ class PathPlan(object):
         #TODO Add max_distance parameter, new nodes should not exceed a certain distance from their nearest node
         ## CODE FOR PATH PLANNING ##
         goal_reached = False
-        max_iter = 100_000
+        max_iter = 100000
         current_iter = 0
         while not goal_reached and current_iter <= max_iter :
-            node_new = self.sample_map(map) # point collision check is perfomed in sampling (only return valid samples)
+            node_new = self.sample_map() # point collision check is perfomed in sampling (only return valid samples)
 
             node_nearest = self.find_nearest_vertex(node_new)
             if self.path_collision_check(map, node_new, node_nearest):
