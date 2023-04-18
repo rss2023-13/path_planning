@@ -33,8 +33,10 @@ class DrivingController():
         self.prev_angle = 0
         self.prev_time = rospy.get_time()
 
-        self.steering_kp = 1
-        self.steering_kd = 0.13
+        #working for v=1: p=1, d=.13,
+        #working for v=2: p=1.4, d=.135
+        self.steering_kp = 1.4
+        self.steering_kd = 0.135
 
         self.velocity_kp = 2
         self.velocity_max = 5
