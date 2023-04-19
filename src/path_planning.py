@@ -134,12 +134,28 @@ class PathPlan(object):
 
     def point_collision_check(self, v, u):
         # return True if collision exists at this cell
-        # grid_ind = None #grid_ind should be the ind of the 1d occupancy grid cell the position belongs in
         return self.map[v][u] != 0
 
     def path_collision_check(self, start, end):
         # check that the path between start, end is collision free - identify occupancy grid squares affected and check each
-        pass
+        checked_cells = set()
+
+        x_orig = (start[0], end[0])
+        y_orig = (start[1], end[1])
+
+        dist = np.linalg.norm(np.array((5,5))-np.array((0,0)))
+        step_dist = .5 * self.map_resolution # tune this
+        num_pts = int(dist / step_dist) # num pts to interpolate
+        x_interp = np.linspace(x_orig[0], y_orig[0], num_pts)
+        y_interp = np.interp(x_interp, x_orig, y_orig)
+
+        for i in range(num_pts):
+            pt = self.world_to_cell(x_interp[i], y_interp[i])
+            # print(pt)
+            if self.point_collision_check(int(pt[0]), int(pt[1])):
+                return False
+        return True
+            
 
     def find_nearest_vertex(self, position):
         print("finding nearest vertex")
@@ -157,11 +173,12 @@ class PathPlan(object):
     def reached_goal(self, node):
         print("checking if goal reachable")
         # if can go from node to end w/o intersecting wall
-        node_cell = self.world_to_cell(node)
+        # can get rid of this function; replaced with path_collision_check(self, node, end_point) in plan_path()
+        # node_cell = self.world_to_cell(node)
 
-        print("current node:", node_cell)
+        # print("current node:", node_cell)
 
-        return node_cell in self.acceptable_goal_cells
+        # return node_cell in self.acceptable_goal_cells
     
 
     ### rrt alg ###
