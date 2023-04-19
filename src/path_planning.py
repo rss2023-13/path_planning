@@ -19,8 +19,9 @@ class PathPlan(object):
         self.map_height = 0
         self.map_width = 0
         self.map_resolution = None
-        self.goal_pose = None
         self.current_pose = None
+        self.goal_pose = None
+        self.acceptable_goal_cells = None
 
         self.odom_topic = rospy.get_param("~odom_topic")
         self.map_sub = rospy.Subscriber("/map", OccupancyGrid, self.map_cb, queue_size=1)
@@ -32,7 +33,7 @@ class PathPlan(object):
         self.traj_pub = rospy.Publisher("/trajectory/current", PoseArray, queue_size=1)
 
         # use 2 dictionaries to manage rrt graph structure / path reconstruction
-        self.tree = {} # parent : set(children) --- actually maybe don't need this, not really using it
+        # self.tree = {} # parent : set(children) --- actually maybe don't need this, not really using it
         self.parents = {} # child : parent
 
         # plan path
@@ -66,7 +67,7 @@ class PathPlan(object):
             return
 
         self.map = np.array(map_msg.data).reshape(map_msg.info.height, map_msg.info.width) # index map as grid[y direction, x direction]
-        print(self.map)
+        # print(self.map)
 
         self.map_height = map_msg.info.height
         self.map_width = map_msg.info.width
@@ -81,6 +82,10 @@ class PathPlan(object):
     def goal_cb(self, msg):
         print("setting goal")
         self.goal_pose = (msg.pose.position.x, msg.pose.position.y) 
+
+        goal_cell = self.world_to_cell(self.goal_pose)
+        self.acceptable_goal_cells = {goal_cell, (goal_cell[0], goal_cell[1]+1), (goal_cell[0], goal_cell[1]-1), (goal_cell[0]+1, goal_cell[1]), (goal_cell[0]-1, goal_cell[1])}
+
 
     def cell_to_world(self, u, v):
         '''
@@ -101,7 +106,7 @@ class PathPlan(object):
                                                     [0, 0, 1]]))
         orig_coord = 1/self.map_resolution * (np.matmul(rotation_matrix_inv, np.array([position[0], position[1], 0])) - self.map_origin)
 
-        return orig_coord # in form of (u, v)
+        return tuple(orig_coord) # in form of (u, v)
 
     ### helpers for rrt alg ###
     def sample_map(self):
@@ -137,6 +142,7 @@ class PathPlan(object):
         pass
 
     def find_nearest_vertex(self, position):
+        print("finding nearest vertex")
         # find nearest vertex to a given position
         # simplest heuristic: euclidean distance
         # could consider others like spline? dubins path? -- this can be an optimization task
@@ -148,15 +154,16 @@ class PathPlan(object):
             min_ind = np.argmin(dists)
             return self.parents.keys()[min_ind]
 
-    def reached_goal(self, node, end_point):
+    def reached_goal(self, node):
+        print("checking if reached goal")
         #if node is near end_point, return true. Else return false
         # "near" = in either the same cell or directly adjacent cell to the goal state cell
         # TODO: exclude adjacent cells that are not empty  
-        goal_cell = self.world_to_cell(end_point)
         node_cell = self.world_to_cell(node)
 
-        acceptable_cells = set(goal_cell, (goal_cell[0], goal_cell[1]+1), (goal_cell[0], goal_cell[1]-1), (goal_cell[0]+1, goal_cell[1]), (goal_cell[0]-1, goal_cell[1]))
-        return node_cell in acceptable_cells
+        print("current node:", node_cell)
+
+        return node_cell in self.acceptable_goal_cells
     
 
     ### rrt alg ###
@@ -165,23 +172,22 @@ class PathPlan(object):
         #TODO Add max_distance parameter, new nodes should not exceed a certain distance from their nearest node
         ## CODE FOR PATH PLANNING ##
         goal_reached = False
-        max_iter = 100000
+        max_iter = 1000
         current_iter = 0
         while not goal_reached and current_iter <= max_iter :
+            print("current iter:", current_iter)
             node_new = self.sample_map() # point collision check is perfomed in sampling (only return valid samples)
             node_nearest = self.find_nearest_vertex(node_new)
-            if self.path_collision_check(node_new, node_nearest):
-                continue
+
+            # if self.path_collision_check(node_new, node_nearest):
+            #     continue
 
             # update tree
-            self.tree[node_new] = set() # initialize new node in tree
-            self.tree[node_nearest].add(node_new) # add new node to child set of node_nearest
+            # self.tree[node_new] = set() # initialize new node in tree
+            # self.tree[node_nearest].add(node_new) # add new node to child set of node_nearest
             self.parents[node_new] = node_nearest
 
-            # if node_new == end_point:
-            #     goal_reached = True
-
-            if self.reached_goal(node_new, end_point):
+            if self.reached_goal(node_new):
                 goal_reached = True
                 break
 
