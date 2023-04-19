@@ -2,8 +2,8 @@
 
 import rospy
 import numpy as np
-from geometry_msgs.msg import Point, PoseStamped, PoseArray
-from nav_msgs.msg import Odometry, OccupancyGrid
+from geometry_msgs.msg import Point, Pose, PoseStamped, PoseArray
+from nav_msgs.msg import Odometry, OccupancyGrid, Path
 import rospkg
 import time, os
 import tf.transformations as tf
@@ -95,7 +95,7 @@ class PathPlan(object):
         rotation_matrix = np.array([[np.cos(angle), np.sin(angle), 0], 
                                     [-np.sin(angle), np.cos(angle), 0], 
                                     [0, 0, 1]])
-        rotated_coord =  np.matmul(rotation_matrix, np.array([u * self.map_resolution + self.map_origin[0], v * self.map_resolution + self.map_origin[1], 0]))
+        rotated_coord =  np.matmul(rotation_matrix, np.array([u * self.map_resolution - self.map_origin[0], v * self.map_resolution - self.map_origin[1], 0]))
         
         return (rotated_coord[0], rotated_coord[1])
 
@@ -104,7 +104,7 @@ class PathPlan(object):
         rotation_matrix_inv = np.linalg.inv(np.array([[np.cos(angle), np.sin(angle), 0], 
                                                     [-np.sin(angle), np.cos(angle), 0], 
                                                     [0, 0, 1]]))
-        orig_coord = 1/self.map_resolution * (np.matmul(rotation_matrix_inv, np.array([position[0], position[1], 0])) - self.map_origin)
+        orig_coord = 1/self.map_resolution * (np.matmul(rotation_matrix_inv, np.array([position[0], position[1], 0])) + self.map_origin)
 
         return tuple(orig_coord) # in form of (u, v)
 
@@ -155,10 +155,8 @@ class PathPlan(object):
             return self.parents.keys()[min_ind]
 
     def reached_goal(self, node):
-        print("checking if reached goal")
-        #if node is near end_point, return true. Else return false
-        # "near" = in either the same cell or directly adjacent cell to the goal state cell
-        # TODO: exclude adjacent cells that are not empty  
+        print("checking if goal reachable")
+        # if can go from node to end w/o intersecting wall
         node_cell = self.world_to_cell(node)
 
         print("current node:", node_cell)
@@ -172,11 +170,11 @@ class PathPlan(object):
         #TODO Add max_distance parameter, new nodes should not exceed a certain distance from their nearest node
         ## CODE FOR PATH PLANNING ##
         goal_reached = False
-        max_iter = 3
+        max_iter = 10
         current_iter = 0
 
         
-        while not goal_reached and current_iter <= max_iter :
+        while not goal_reached and current_iter < max_iter :
             print("current iter:", current_iter)
             node_new = self.sample_map() # point collision check is perfomed in sampling (only return valid samples)
             node_nearest = self.find_nearest_vertex(node_new)
@@ -189,7 +187,7 @@ class PathPlan(object):
             # self.tree[node_nearest].add(node_new) # add new node to child set of node_nearest
             self.parents[node_new] = node_nearest
 
-            if current_iter == max_iter or self.reached_goal(node_new):
+            if current_iter == max_iter - 1 or not self.path_collision_check(node_new, end_point):
                 goal_reached = True
                 self.parents[end_point] = node_new # connect it to the goal
                 break
@@ -210,7 +208,10 @@ class PathPlan(object):
             reverse_path.append(current_node)
 
         for pt in reverse_path[::-1]: # populate trajectory object
-            self.trajectory.addPoint(Point(x=pt[0], y=pt[1]))
+            point_obj = Point(x=pt[0], y=pt[1])
+            self.trajectory.addPoint(point_obj)
+
+            
 
         # publish trajectory
         self.traj_pub.publish(self.trajectory.toPoseArray())
@@ -227,6 +228,9 @@ if __name__=="__main__":
         pass
     print("these are map dims:", pf.map_height, pf.map_width)
     pf.plan_path(pf.current_pose, pf.goal_pose, pf.map, None)
+
+    # print("map origin:", pf.map_origin)
+    # print("transformed origin:", pf.cell_to_world(0, 0))
 
 
     rospy.spin()
