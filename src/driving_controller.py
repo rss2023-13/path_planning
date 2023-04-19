@@ -35,10 +35,10 @@ class DrivingController():
 
         #working for v=1: p=1, d=.13,
         #working for v=2: p=1.5, d=.135
-        self.steering_kp = 1.5
-        self.steering_kd = 0.135
+        self.steering_kp = 1
+        self.steering_kd = 0.13
 
-        self.velocity_kp = 2
+        self.velocity_kp = 1
         self.velocity_max = 5
 
     def pose_callback(self, odom):
