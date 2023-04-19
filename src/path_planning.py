@@ -2,7 +2,7 @@
 
 import rospy
 import numpy as np
-from geometry_msgs.msg import PoseStamped, PoseArray
+from geometry_msgs.msg import Point, PoseStamped, PoseArray
 from nav_msgs.msg import Odometry, OccupancyGrid
 import rospkg
 import time, os
@@ -172,8 +172,10 @@ class PathPlan(object):
         #TODO Add max_distance parameter, new nodes should not exceed a certain distance from their nearest node
         ## CODE FOR PATH PLANNING ##
         goal_reached = False
-        max_iter = 1000
+        max_iter = 3
         current_iter = 0
+
+        
         while not goal_reached and current_iter <= max_iter :
             print("current iter:", current_iter)
             node_new = self.sample_map() # point collision check is perfomed in sampling (only return valid samples)
@@ -187,13 +189,16 @@ class PathPlan(object):
             # self.tree[node_nearest].add(node_new) # add new node to child set of node_nearest
             self.parents[node_new] = node_nearest
 
-            if self.reached_goal(node_new):
+            if current_iter == max_iter or self.reached_goal(node_new):
                 goal_reached = True
+                self.parents[end_point] = node_new # connect it to the goal
                 break
 
             current_iter += 1
 
+        
         print("path search end, iterations:", current_iter)
+        print("tree", self.parents)
 
         # by this point, the tree has been constructed
         # reconstruct trajectory given graph by recursing thru self.parents
@@ -201,11 +206,11 @@ class PathPlan(object):
 
         current_node = end_point
         while current_node != start_point:
-            current_node = self.parents[end_point] # backtrack to parent node
+            current_node = self.parents[current_node] # backtrack to parent node
             reverse_path.append(current_node)
 
         for pt in reverse_path[::-1]: # populate trajectory object
-            self.trajectory.addPoint(pt)
+            self.trajectory.addPoint(Point(x=pt[0], y=pt[1]))
 
         # publish trajectory
         self.traj_pub.publish(self.trajectory.toPoseArray())
