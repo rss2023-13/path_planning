@@ -18,7 +18,7 @@ class PurePursuit(object):
     """
     def __init__(self):
         self.odom_topic       = rospy.get_param("~odom_topic", "/pf/pose/odom")
-        self.lookahead        = 1.4 # TODO: Tune this
+        self.lookahead        = 0.7 # 0.7 for v=1, 1 for v=2
         # self.wheelbase_length = # FILL IN #
         
         self.pose = None
@@ -127,10 +127,6 @@ class PurePursuit(object):
             return True, p1
         else: # Move to next line segment if the one closer to endpoint is not on the segment
             return False, None
-        # elif 0 <= t2 <= 1:
-        #     return True, p2
-        # else: # No solutions within the line segment
-        #     return False, None
 
     
     def old_min_dist(self, robot_position, v, w):

@@ -2,7 +2,7 @@ import rosbag
 import matplotlib.pyplot as plt
 import math
 
-BAG_FILE = 'slow2.bag'
+BAG_FILE = '4working.bag'
 bag = rosbag.Bag(BAG_FILE)
 all_topics = ['traj_error']
 
@@ -20,8 +20,8 @@ for i in range(len(times)):
 print(sum(dist)/len(dist))
 
 plt.plot(new_times, dist, 'b')
-plt.axis([0,82,0,1])
-plt.title("Distance of Car from Trajectory - Lookahead = 1m, Velocity = 1m/s")
+plt.axis([0,40,0,1])
+plt.title("Distance of Car from Trajectory - Lookahead = 1.2m, Velocity = 2m/s")
 plt.xlabel("Time")
 plt.ylabel("Error Magnitude")
 plt.legend()
