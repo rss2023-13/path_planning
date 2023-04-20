@@ -129,7 +129,7 @@ class LineTrajectory(object):
         rospy.loginfo('start')
         rospy.loginfo(self.visualize)
         rospy.loginfo(self.start_pub.get_num_connections())
-        if True:
+        if self.visualize and self.start_pub.get_num_connections() > 0::
             print "Publishing start point"
             marker = Marker()
             marker.header = self.make_header("/map")
@@ -159,7 +159,7 @@ class LineTrajectory(object):
 
     def publish_end_point(self, duration=0.0):
         should_publish = len(self.points) > 1
-        if True:
+        if self.visualize and self.end_pub.get_num_connections() > 0::
             print "Publishing end point"
             marker = Marker()
             marker.header = self.make_header("/map")
