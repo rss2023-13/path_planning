@@ -83,6 +83,8 @@ class PathPlan(object):
         print("setting goal + running plan_path")
         self.goal_pose = (msg.pose.position.x, msg.pose.position.y) 
 
+        self.trajectory.clear()
+        self.parents = {}
         self.plan_path(self.current_pose, self.goal_pose, self.map, None)
 
     def cell_to_world(self, u, v):
@@ -135,7 +137,7 @@ class PathPlan(object):
         return self.map[v][u] != 0
 
     def path_collision_check(self, start, end):
-        print("checking path for collision")
+        # print("checking path for collision")
         # check that the path between start, end is collision free - identify occupancy grid squares affected and check each
         # Return True if there is a collision
         checked_cells = set()
@@ -144,7 +146,7 @@ class PathPlan(object):
         y_orig = (start[1], end[1])
 
         dist = np.linalg.norm(np.array((5,5))-np.array((0,0)))
-        step_dist = .5 * self.map_resolution # tune this
+        step_dist = .3 * self.map_resolution # tune this
         num_pts = int(dist / step_dist) # num pts to interpolate
         x_interp = np.linspace(x_orig[0], y_orig[0], num_pts)
         y_interp = np.interp(x_interp, x_orig, y_orig)
@@ -155,8 +157,8 @@ class PathPlan(object):
             # print(pt)
             if cell in checked_cells:
                 continue
-            
-            checked_cells.add(cell)
+            else:
+                checked_cells.add(cell)
             if self.point_collision_check(cell[1], cell[0]):
                 return True
             
@@ -170,8 +172,17 @@ class PathPlan(object):
         # could consider others like spline? dubins path? -- this can be an optimization task
         # iterate through node list and identify the one with lowest distance
         dists = np.array([np.linalg.norm(np.array(position) - np.array(v)) for v in self.parents.keys()]) # euclidean distance to all vertices
+
+        sorted_args = np.argsort(dists)
+
         min_ind = np.argmin(dists)
-        return self.parents.keys()[min_ind]
+
+        existing_nodes = np.array(self.parents.keys())[sorted_args]
+
+        for node in existing_nodes: 
+            if not self.path_collision_check(position, node):
+                return tuple(node)
+        print("no vertices free")
 
     def reached_goal(self, node):
         # print("checking if goal reachable")
@@ -191,7 +202,7 @@ class PathPlan(object):
         #TODO Add max_distance parameter, new nodes should not exceed a certain distance from their nearest node
         ## CODE FOR PATH PLANNING ##
         goal_reached = False
-        max_iter = 5000
+        max_iter = 100
         current_iter = 0
 
         self.parents[start_point] = None
@@ -206,8 +217,6 @@ class PathPlan(object):
             node_new = self.sample_map() # point collision check is perfomed in sampling (only return valid samples)
             node_nearest = self.find_nearest_vertex(node_new)
 
-            if self.path_collision_check(node_new, node_nearest):
-                continue
 
             # update tree
             # self.tree[node_new] = set() # initialize new node in tree
