@@ -21,7 +21,7 @@ class DrivingController():
         rospy.Subscriber("/intersection", PointStamped,
             self.lookahead_callback)
 
-        self.drive_pub = rospy.Publisher("/drive", AckermannDriveStamped, queue_size=1)
+        self.drive_pub = rospy.Publisher("/vesc/ackermann_cmd_mux/input/navigation", AckermannDriveStamped, queue_size=1)
         self.pose_sub = rospy.Subscriber(self.odom_topic, Odometry, self.pose_callback, queue_size=1)
 
         self.robot_pose = None
@@ -35,10 +35,10 @@ class DrivingController():
 
         #working for v=1: p=1, d=.13,
         #working for v=2: p=1.5, d=.135
-        self.steering_kp = 1
-        self.steering_kd = 0.13
+        self.steering_kp = 0.2
+        self.steering_kd = 0.075
 
-        self.velocity_kp = 1
+        self.velocity_kp = 1.5
         self.velocity_max = 5
 
     def pose_callback(self, odom):
@@ -75,11 +75,11 @@ class DrivingController():
 
         print('y', y_error)
 
-        if y_error > 0.8:
-            velocity = 0
-            print('stopping', y_error)
-        elif y_error > 0.2:
-            steering_angle *= 2
+#        if y_error > 0.8:
+#            velocity = 0
+#            print('stopping', y_error)
+#        elif y_error > 0.2:
+#            steering_angle *= 2
 
         drive_cmd.drive.steering_angle = steering_angle
         drive_cmd.drive.speed = np.min([velocity, self.velocity_max])

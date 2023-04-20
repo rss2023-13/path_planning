@@ -18,7 +18,7 @@ class PurePursuit(object):
     """
     def __init__(self):
         self.odom_topic       = rospy.get_param("~odom_topic", "/pf/pose/odom")
-        self.lookahead        = 0.7 # 0.7 for v=1, 1 for v=2
+        self.lookahead        = 1.2 # 0.7 for v=1, 1 for v=2
         # self.wheelbase_length = # FILL IN #
         
         self.pose = None
@@ -84,8 +84,9 @@ class PurePursuit(object):
         while not point_exists: # Loop through the segments in the traj
             start_point = np.array(self.trajectory.points[current_segment_index])
             end_point = np.array(self.trajectory.points[current_segment_index+1])
-
+	    print(start_point, end_point)
             point_exists, point = self.circle_intersection(start_point, end_point, robot_position)
+	    print(point)
             if point_exists:
                 return point_exists, point
 
