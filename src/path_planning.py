@@ -31,6 +31,8 @@ class PathPlan(object):
 
         self.trajectory = LineTrajectory("/planned_trajectory")
         self.traj_pub = rospy.Publisher("/trajectory/current", PoseArray, queue_size=1)
+        
+        self.vertex_pub = rospy.Publisher("/vertices", PoseArray, queue_size=1)
 
         # use 2 dictionaries to manage rrt graph structure / path reconstruction
         # self.tree = {} # parent : set(children) --- actually maybe don't need this, not really using it
@@ -207,6 +209,9 @@ class PathPlan(object):
 
         self.parents[start_point] = None
 
+        vertices = PoseArray()
+        vertices.header = self.trajectory.make_header("/map")
+
         if not self.path_collision_check(start_point, end_point): # if there's a direct path between start and end
             self.parents[end_point] = start_point
             goal_reached = True 
@@ -215,8 +220,17 @@ class PathPlan(object):
 
             print("current iter:", current_iter)
             node_new = self.sample_map() # point collision check is perfomed in sampling (only return valid samples)
+
+            
             node_nearest = self.find_nearest_vertex(node_new)
 
+            
+            vertex_pose = Pose()
+            vertex_pose.position.x = node_new[0]
+            vertex_pose.position.y = node_new[1]
+            vertices.poses.append(vertex_pose)
+
+            self.vertex_pub.publish(vertices)
 
             # update tree
             # self.tree[node_new] = set() # initialize new node in tree
@@ -230,7 +244,6 @@ class PathPlan(object):
 
             current_iter += 1
 
-        
         print("path search end, iterations:", current_iter)
         # print("tree", self.parents)
 
@@ -254,6 +267,8 @@ class PathPlan(object):
 
         # publish trajectory
         self.traj_pub.publish(self.trajectory.toPoseArray())
+
+        
 
         # visualize trajectory Markers
         self.trajectory.publish_viz()
