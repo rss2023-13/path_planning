@@ -150,10 +150,16 @@ class PathPlan(object):
         y_interp = np.interp(x_interp, x_orig, y_orig)
 
         for i in range(num_pts):
-            pt = self.world_to_cell(x_interp[i], y_interp[i])
+            pt = self.world_to_cell((x_interp[i], y_interp[i])) # get map frame coord
+            cell = (int(pt[0]), int(pt[1])) # convert to cell ind
             # print(pt)
-            if self.point_collision_check(int(pt[0]), int(pt[1])):
+            if cell in checked_cells:
+                continue
+            
+            checked_cells.add(cell)
+            if self.point_collision_check(cell[1], cell[0]):
                 return False
+            
         return True
             
 
@@ -163,12 +169,9 @@ class PathPlan(object):
         # simplest heuristic: euclidean distance
         # could consider others like spline? dubins path? -- this can be an optimization task
         # iterate through node list and identify the one with lowest distance
-        if self.parents == {}: # for first non-init vertex
-            return self.current_pose
-        else:
-            dists = np.array([np.linalg.norm(np.array(position) - np.array(v)) for v in self.parents.keys()]) # euclidean distance to all vertices
-            min_ind = np.argmin(dists)
-            return self.parents.keys()[min_ind]
+        dists = np.array([np.linalg.norm(np.array(position) - np.array(v)) for v in self.parents.keys()]) # euclidean distance to all vertices
+        min_ind = np.argmin(dists)
+        return self.parents.keys()[min_ind]
 
     def reached_goal(self, node):
         print("checking if goal reachable")
@@ -190,6 +193,7 @@ class PathPlan(object):
         max_iter = 10
         current_iter = 0
 
+        self.parents[start_point] = None
         
         while not goal_reached and current_iter < max_iter :
             print("current iter:", current_iter)
@@ -220,7 +224,7 @@ class PathPlan(object):
         reverse_path = [end_point] # points along traj in reverse order
 
         current_node = end_point
-        while current_node != start_point:
+        while current_node != None:
             current_node = self.parents[current_node] # backtrack to parent node
             reverse_path.append(current_node)
 
