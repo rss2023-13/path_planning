@@ -138,6 +138,7 @@ class PathPlan(object):
 
     def path_collision_check(self, start, end):
         # check that the path between start, end is collision free - identify occupancy grid squares affected and check each
+        # return True if collision exists 
         checked_cells = set()
 
         x_orig = (start[0], end[0])
@@ -158,13 +159,13 @@ class PathPlan(object):
             
             checked_cells.add(cell)
             if self.point_collision_check(cell[1], cell[0]):
-                return False
+                return True
             
-        return True
+        return False
             
 
     def find_nearest_vertex(self, position):
-        print("finding nearest vertex")
+        # print("finding nearest vertex")
         # find nearest vertex to a given position
         # simplest heuristic: euclidean distance
         # could consider others like spline? dubins path? -- this can be an optimization task
@@ -174,7 +175,7 @@ class PathPlan(object):
         return self.parents.keys()[min_ind]
 
     def reached_goal(self, node):
-        print("checking if goal reachable")
+        # print("checking if goal reachable")
         # if can go from node to end w/o intersecting wall
         # can get rid of this function; replaced with path_collision_check(self, node, end_point) in plan_path()
         # node_cell = self.world_to_cell(node)
@@ -182,6 +183,7 @@ class PathPlan(object):
         # print("current node:", node_cell)
 
         # return node_cell in self.acceptable_goal_cells
+        pass
     
 
     ### rrt alg ###
@@ -190,18 +192,19 @@ class PathPlan(object):
         #TODO Add max_distance parameter, new nodes should not exceed a certain distance from their nearest node
         ## CODE FOR PATH PLANNING ##
         goal_reached = False
-        max_iter = 10
+        max_iter = 10000
         current_iter = 0
 
         self.parents[start_point] = None
         
         while not goal_reached and current_iter < max_iter :
-            print("current iter:", current_iter)
+
+            # print("current iter:", current_iter)
             node_new = self.sample_map() # point collision check is perfomed in sampling (only return valid samples)
             node_nearest = self.find_nearest_vertex(node_new)
 
-            # if self.path_collision_check(node_new, node_nearest):
-            #     continue
+            if self.path_collision_check(node_new, node_nearest):
+                continue
 
             # update tree
             # self.tree[node_new] = set() # initialize new node in tree
@@ -217,14 +220,14 @@ class PathPlan(object):
 
         
         print("path search end, iterations:", current_iter)
-        print("tree", self.parents)
+        # print("tree", self.parents)
 
         # by this point, the tree has been constructed
         # reconstruct trajectory given graph by recursing thru self.parents
         reverse_path = [end_point] # points along traj in reverse order
 
         current_node = end_point
-        while current_node != None:
+        while self.parents[current_node] != None:
             current_node = self.parents[current_node] # backtrack to parent node
             reverse_path.append(current_node)
 
@@ -232,7 +235,10 @@ class PathPlan(object):
             point_obj = Point(x=pt[0], y=pt[1])
             self.trajectory.addPoint(point_obj)
 
-            
+        # self.trajectory.addPoint(Point(x=0,y=0))
+        # self.trajectory.addPoint(Point(x=5,y=0))
+        # self.trajectory.addPoint(Point(x=0,y=2))
+                    
 
         # publish trajectory
         self.traj_pub.publish(self.trajectory.toPoseArray())
