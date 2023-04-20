@@ -8,6 +8,7 @@ import rospkg
 import time, os
 import tf.transformations as tf
 from utils import LineTrajectory
+from scipy import ndimage
 
 class PathPlan(object):
     """ Listens for goal pose published by RViz and uses it to plan a path from
@@ -30,6 +31,8 @@ class PathPlan(object):
 
         self.trajectory = LineTrajectory("/planned_trajectory")
         self.traj_pub = rospy.Publisher("/trajectory/current", PoseArray, queue_size=1)
+        
+        self.vertex_pub = rospy.Publisher("/vertices", PoseArray, queue_size=1)
 
         # use 2 dictionaries to manage rrt graph structure / path reconstruction
         # self.tree = {} # parent : set(children) --- actually maybe don't need this, not really using it
@@ -64,9 +67,14 @@ class PathPlan(object):
 
         if self.map != None and self.static_map == True: #only run callback until we get the map
             return
-
-        self.map = np.array(map_msg.data).reshape(map_msg.info.height, map_msg.info.width) # index map as grid[y direction, x direction]
-        # print(self.map)
+        old_map = np.array(map_msg.data)
+        old_map_negatives = old_map == -1
+        new_map = ndimage.binary_dilation(old_map).astype(old_map.dtype)
+        for idx, boo in enumerate(old_map_negatives):
+            if boo:
+                new_map[idx] = -1
+        self.map = new_map.reshape(map_msg.info.height, map_msg.info.width) # index map as grid[y direction, x direction]
+        #print(self.map)
 
         self.map_height = map_msg.info.height
         self.map_width = map_msg.info.width
@@ -211,6 +219,9 @@ class PathPlan(object):
 
         self.parents[start_point] = None
 
+        vertices = PoseArray()
+        vertices.header = self.trajectory.make_header("/map")
+
         if not self.path_collision_check(start_point, end_point): # if there's a direct path between start and end
             self.parents[end_point] = start_point
             goal_reached = True 
@@ -236,7 +247,6 @@ class PathPlan(object):
 
             current_iter += 1
 
-        
         print("path search end, iterations:", current_iter)
         
         # print("tree", self.parents)
@@ -262,6 +272,8 @@ class PathPlan(object):
 
         # publish trajectory
         self.traj_pub.publish(self.trajectory.toPoseArray())
+
+        
 
         # visualize trajectory Markers
         self.trajectory.publish_viz()

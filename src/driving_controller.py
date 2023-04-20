@@ -75,11 +75,11 @@ class DrivingController():
 
         print('y', y_error)
 
-        if y_error > 0.8:
-            velocity = 0
-            print('stopping', y_error)
-        elif y_error > 0.2:
-            steering_angle *= 2
+#        if y_error > 0.8:
+#            velocity = 0
+#            print('stopping', y_error)
+#        elif y_error > 0.2:
+#            steering_angle *= 2
 
         drive_cmd.drive.steering_angle = steering_angle
         drive_cmd.drive.speed = np.min([velocity, self.velocity_max])
@@ -121,6 +121,10 @@ class DrivingController():
     def euler_from_quaternion(self, quaternion):
         return tf.euler_from_quaternion([quaternion.x, quaternion.y, quaternion.z, quaternion.w])
 
+if __name__=="__main__":
+    rospy.init_node("driving_controller")
+    dc = DrivingController()
+    rospy.spin()
 
 # if __name__ == '__main__':
 #     try:
