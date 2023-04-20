@@ -25,6 +25,7 @@ class PurePursuit(object):
         self.target_point = None
 
         self.trajectory  = utils.LineTrajectory("/followed_trajectory")
+        self.received_traj = False
         self.traj_sub = rospy.Subscriber("/trajectory/current", PoseArray, self.trajectory_callback, queue_size=1)
         self.pose_sub = rospy.Subscriber(self.odom_topic, Odometry, self.pose_callback, queue_size=1)
         self.error_pub = rospy.Publisher("/traj_error", Float32MultiArray, queue_size=1)
@@ -36,6 +37,7 @@ class PurePursuit(object):
         ''' Clears the currently followed trajectory, and loads the new one from the message
         '''
         print("Receiving new trajectory:", len(msg.poses), "points")
+        self.received_traj = True
         self.trajectory.clear()
         self.trajectory.fromPoseArray(msg)
         self.trajectory.publish_viz(duration=0.0)
@@ -44,15 +46,16 @@ class PurePursuit(object):
         self.pose = odom.pose.pose
         robot_position = np.array([self.pose.position.x, self.pose.position.y])
 
-        min_segment_index, min_point, min_dist = self.min_dist(robot_position, self.trajectory.points)
-        self.min_point_pub.publish(PointStamped(point=Point(x=min_point[0], y=min_point[1], z=0), 
+        if self.received_traj:
+            min_segment_index, min_point, min_dist = self.min_dist(robot_position, self.trajectory.points)
+            self.min_point_pub.publish(PointStamped(point=Point(x=min_point[0], y=min_point[1], z=0), 
+                                                header=Header(frame_id="map")))
+            intersection_exists, intersection = self.find_intersection(min_segment_index, robot_position)
+            if intersection_exists:
+                self.intersection_pub.publish(PointStamped(point=Point(x=intersection[0], y=intersection[1], z=0), 
                                             header=Header(frame_id="map")))
-        intersection_exists, intersection = self.find_intersection(min_segment_index, robot_position)
-        if intersection_exists:
-            self.intersection_pub.publish(PointStamped(point=Point(x=intersection[0], y=intersection[1], z=0), 
-                                        header=Header(frame_id="map")))
-            
-        self.error_pub.publish(Float32MultiArray(data=[min_dist]))
+                
+            self.error_pub.publish(Float32MultiArray(data=[min_dist]))
 
 
     def min_dist(self, robot_position, trajectory_points):
