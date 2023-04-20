@@ -151,5 +151,4 @@ class PurePursuit(object):
 if __name__=="__main__":
     rospy.init_node("pure_pursuit")
     pf = PurePursuit()
-    dc = DrivingController()
     rospy.spin()

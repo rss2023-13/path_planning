@@ -121,6 +121,10 @@ class DrivingController():
     def euler_from_quaternion(self, quaternion):
         return tf.euler_from_quaternion([quaternion.x, quaternion.y, quaternion.z, quaternion.w])
 
+if __name__=="__main__":
+    rospy.init_node("driving_controller")
+    dc = DrivingController()
+    rospy.spin()
 
 # if __name__ == '__main__':
 #     try:
