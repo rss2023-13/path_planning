@@ -138,6 +138,7 @@ class PathPlan(object):
 
     def path_collision_check(self, start, end):
         # check that the path between start, end is collision free - identify occupancy grid squares affected and check each
+        # Return True if there is a collision
         checked_cells = set()
 
         x_orig = (start[0], end[0])
@@ -194,6 +195,10 @@ class PathPlan(object):
         current_iter = 0
 
         self.parents[start_point] = None
+
+        if not self.path_collision_check(start_point, end_point): # if there's a direct path between start and end
+            self.parents[end_point] = start_point
+            goal_reached = True
         
         while not goal_reached and current_iter < max_iter :
             print("current iter:", current_iter)
