@@ -18,7 +18,7 @@ class PurePursuit(object):
     """
     def __init__(self):
         self.odom_topic       = rospy.get_param("~odom_topic", "/pf/pose/odom")
-        self.lookahead        = 0.7 # 0.7 for v=1, 1 for v=2
+        self.lookahead        = 1.2 # 0.7 for v=1, 1 for v=2
         # self.wheelbase_length = # FILL IN #
         
         self.pose = None
@@ -154,4 +154,5 @@ class PurePursuit(object):
 if __name__=="__main__":
     rospy.init_node("pure_pursuit")
     pf = PurePursuit()
+    dc = DrivingController()
     rospy.spin()

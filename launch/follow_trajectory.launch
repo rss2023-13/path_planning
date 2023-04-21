@@ -2,5 +2,4 @@
 	<node pkg="lab6" type="pure_pursuit.py" name="Trajectory_follower">
 		<param name="odom_topic" value="/pf/pose/odom"/>
 	</node>
-	<node pkg="lab6" type="driving_controller.py" name="driving_controller"></node>
 </launch>
