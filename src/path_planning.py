@@ -2,7 +2,7 @@
 
 import rospy
 import numpy as np
-from geometry_msgs.msg import Point, Pose, PoseStamped, PoseArray
+from geometry_msgs.msg import Point, Pose, PoseStamped, PoseArray, PointStamped
 from nav_msgs.msg import Odometry, OccupancyGrid, Path
 import rospkg
 import time, os
@@ -23,16 +23,21 @@ class PathPlan(object):
         self.current_pose = None
         self.goal_pose = None
 
+        self.run_planner = True # set this to False when doing path_collision_check interpolation testing
+
         self.odom_topic = rospy.get_param("~odom_topic")
         self.map_sub = rospy.Subscriber("/map", OccupancyGrid, self.map_cb, queue_size=1)
         self.goal_sub = rospy.Subscriber("/move_base_simple/goal", PoseStamped, self.goal_cb, queue_size=1)
         self.odom_sub = rospy.Subscriber(self.odom_topic, Odometry, self.odom_cb, queue_size=1)
 
-
         self.trajectory = LineTrajectory("/planned_trajectory")
         self.traj_pub = rospy.Publisher("/trajectory/current", PoseArray, queue_size=1)
-        
+
+        self.point_sub = rospy.Subscriber('/clicked_point', PointStamped, self.point_cb, queue_size=1)
+        self.points = PoseArray()
+        self.points.header = self.trajectory.make_header("/map")
         self.vertex_pub = rospy.Publisher("/vertices", PoseArray, queue_size=1)
+
 
         # use 2 dictionaries to manage rrt graph structure / path reconstruction
         # self.tree = {} # parent : set(children) --- actually maybe don't need this, not really using it
@@ -43,6 +48,18 @@ class PathPlan(object):
         #     rospy.spin()
             
         # self.plan_path(self.current_pose, self.goal_pose, self.map, None)
+
+    def visualize_point(self, point):
+        vertex_pose = Pose()
+        vertex_pose.position.x = point[0]
+        vertex_pose.position.y = point[1]
+        self.points.poses.append(vertex_pose)
+
+        self.vertex_pub.publish(self.points)
+
+    def point_cb(self, point_msg):
+        point_coords = (point_msg.point.x, point_msg.point.y)
+        print(self.path_collision_check(point_coords, self.goal_pose))
 
 
     def map_cb(self, map_msg): 
@@ -93,7 +110,9 @@ class PathPlan(object):
 
         self.trajectory.clear()
         self.parents = {}
-        self.plan_path(self.current_pose, self.goal_pose, max_distance = 5)
+
+        if self.run_planner == True:
+            self.plan_path(self.current_pose, self.goal_pose, max_distance = 5)
 
     def cell_to_world(self, u, v):
         '''convert from map frame to world frame'''
@@ -167,6 +186,9 @@ class PathPlan(object):
                 # continue
             # else:
                 # checked_cells.add(cell)
+
+            self.visualize_point((x_interp[i], y_interp[i]))
+
             if self.point_collision_check(cell[1], cell[0]):
                 print("path collision")
                 return True
