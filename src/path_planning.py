@@ -10,6 +10,7 @@ import tf.transformations as tf
 from utils import LineTrajectory
 from scipy import ndimage
 from std_msgs.msg import Header
+import cv2
 
 class PathPlan(object):
     """ Listens for goal pose published by RViz and uses it to plan a path from
@@ -92,13 +93,14 @@ class PathPlan(object):
         if self.map != None and self.static_map == True: #only run callback until we get the map
             return
         old_map = np.array(map_msg.data)
-        old_map_negatives = old_map == -1
-        new_map = ndimage.binary_dilation(old_map).astype(old_map.dtype)
-        for idx, boo in enumerate(old_map_negatives):
-            if boo:
-                new_map[idx] = -1
-        self.map = new_map.reshape(map_msg.info.height, map_msg.info.width) # index map as grid[y direction, x direction]
-        #print(self.map)
+        old_map[old_map == -1] = 1 # unknown cell set to occupied
+        old_map[old_map == 100] = 1
+
+        old_map = old_map.reshape(map_msg.info.height, map_msg.info.width)
+        
+        kernel = np.ones((15,15), np.uint8)
+        self.map = cv2.dilate(old_map.astype(np.uint8), kernel, iterations=1)
+         # index map as grid[y direction, x direction]
 
         self.map_height = map_msg.info.height
         self.map_width = map_msg.info.width
@@ -275,7 +277,8 @@ class PathPlan(object):
             # self.tree[node_new] = set() # initialize new node in tree
             # self.tree[node_nearest].add(node_new) # add new node to child set of node_nearest
 
-            if current_iter == max_iter - 1 or not self.path_collision_check(node_new, end_point):
+            if current_iter == max_iter - 1 or (not self.path_collision_check(node_new, end_point) 
+                                                and np.linalg.norm(np.array(node_new)-np.array(end_point))<max_distance):
                 goal_reached = True
                 self.vertex_pub.publish(self.points)
                 # print('final', self.points, goal_reached, current_iter)
