@@ -9,6 +9,7 @@ import time, os
 import tf.transformations as tf
 from utils import LineTrajectory
 from scipy import ndimage
+from std_msgs.msg import Header
 
 class PathPlan(object):
     """ Listens for goal pose published by RViz and uses it to plan a path from
@@ -56,6 +57,12 @@ class PathPlan(object):
         self.points.poses.append(vertex_pose)
 
         self.vertex_pub.publish(self.points)
+
+    #nandini's visualization
+    def visualize_points(self, n, x_points, y_points):
+        self.points.poses = []
+        for i in range(n):
+            self.points.poses.append(Pose(position = Point(x = x_points[i], y=y_points[i])))
 
     def point_cb(self, point_msg):
         point_coords = (point_msg.point.x, point_msg.point.y)
@@ -105,7 +112,7 @@ class PathPlan(object):
         self.current_pose = (msg.pose.pose.position.x, msg.pose.pose.position.y) 
 
     def goal_cb(self, msg):
-        print("setting goal + running plan_path")
+        # print("setting goal + running plan_path")
         self.goal_pose = (msg.pose.position.x, msg.pose.position.y) 
 
         self.trajectory.clear()
@@ -168,15 +175,21 @@ class PathPlan(object):
         # Return True if there is a collision
         checked_cells = set()
 
-        x_orig = (start[0], end[0])
-        y_orig = (start[1], end[1])
+        if start[0] < end[0]:
+            x_orig = (start[0], end[0])
+            y_orig = (start[1], end[1])
+        else:
+            x_orig = (end[0], start[0])
+            y_orig = (end[1], start[1])
 
         dist = np.linalg.norm(np.array(start)-np.array(end))
         step_dist = .25 * self.map_resolution # tune this
         num_pts = int(dist / step_dist) # num pts to interpolate
-        print("checking pts", num_pts)
+        
         x_interp = np.linspace(x_orig[0], x_orig[1], num_pts)
         y_interp = np.interp(x_interp, x_orig, y_orig)
+
+        self.visualize_points(num_pts, x_interp, y_interp)
 
         for i in range(num_pts):
             pt = self.world_to_cell((x_interp[i], y_interp[i])) # get map frame coord
@@ -187,16 +200,16 @@ class PathPlan(object):
             # else:
                 # checked_cells.add(cell)
 
-            self.visualize_point((x_interp[i], y_interp[i]))
+            # self.visualize_point((x_interp[i], y_interp[i]))
 
             if self.point_collision_check(cell[1], cell[0]):
-                print("path collision")
+                # print("path collision")
                 return True
             
         return False
     
     def calculate_new_node(self, node_sampled, node_nearest, max_distance):
-        print("calculating new node")
+        # print("calculating new node")
         node_sampled = np.array(node_sampled)
         node_nearest = np.array(node_nearest)
         dist = np.linalg.norm(node_sampled-node_nearest)
@@ -209,7 +222,7 @@ class PathPlan(object):
         
 
     def find_nearest_vertex(self, position):
-        print("finding nearest vertex")
+        # print("finding nearest vertex")
         # find nearest vertex to a given position
         # simplest heuristic: euclidean distance
         # could consider others like spline? dubins path? -- this can be an optimization task
@@ -232,7 +245,7 @@ class PathPlan(object):
 
     ### rrt alg ###
     def plan_path(self, start_point, end_point, max_distance):
-        print("planning path now")
+        # print("planning path now")
         #TODO Add max_distance parameter, new nodes should not exceed a certain distance from their nearest node
         ## CODE FOR PATH PLANNING ##
         goal_reached = False
@@ -249,7 +262,7 @@ class PathPlan(object):
             goal_reached = True 
         
         while not goal_reached and current_iter < max_iter :
-            print("current iter:", current_iter)
+            # print("current iter:", current_iter)
             node_sampled = self.sample_map() # point collision check is perfomed in sampling (only return valid samples)
             node_nearest = self.find_nearest_vertex(node_sampled)
 
@@ -264,12 +277,14 @@ class PathPlan(object):
 
             if current_iter == max_iter - 1 or not self.path_collision_check(node_new, end_point):
                 goal_reached = True
+                self.vertex_pub.publish(self.points)
+                # print('final', self.points, goal_reached, current_iter)
                 self.parents[end_point] = node_new # connect it to the goal
                 break
 
             current_iter += 1
 
-        print("path search end, iterations:", current_iter)
+        # print("path search end, iterations:", current_iter)
         
         # print("tree", self.parents)
 
