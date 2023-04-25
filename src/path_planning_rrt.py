@@ -67,7 +67,7 @@ class PathPlan(object):
 
     def point_cb(self, point_msg):
         point_coords = (point_msg.point.x, point_msg.point.y)
-        print(self.path_collision_check(point_coords, self.goal_pose))
+        # print(self.path_collision_check(point_coords, self.goal_pose))
 
 
     def map_cb(self, map_msg): 
@@ -251,7 +251,7 @@ class PathPlan(object):
         #TODO Add max_distance parameter, new nodes should not exceed a certain distance from their nearest node
         ## CODE FOR PATH PLANNING ##
         goal_reached = False
-        max_iter = 250
+        max_iter = 1000
         current_iter = 0
 
         self.parents[start_point] = None
@@ -283,6 +283,9 @@ class PathPlan(object):
                 self.vertex_pub.publish(self.points)
                 # print('final', self.points, goal_reached, current_iter)
                 self.parents[end_point] = node_new # connect it to the goal
+
+                print("path search ended, used iterations:", current_iter)
+                print("from", start_point, "to", end_point)
                 break
 
             current_iter += 1
